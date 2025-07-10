@@ -15,7 +15,7 @@ const ProblemLibrary: React.FC = () => {
   useEffect(() => {
     const fetchProblems = async () => {
       try {
-        let url = "http://127.0.0.1:8000/api/problems/problems/";
+        let url = "https://interviewkitplusapi.onrender.com/api/problems/problems/";
         if (category) {
           url += `?category=${encodeURIComponent(category)}`;
         }
