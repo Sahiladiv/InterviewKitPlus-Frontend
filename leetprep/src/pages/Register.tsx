@@ -27,7 +27,7 @@ const Register: React.FC = () => {
     }
 
     try {
-      const res = await fetch('http://localhost:8000/api/auth/register/', {
+      const res = await fetch('https://interviewkitplusapi.onrender.com/api/auth/register/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
