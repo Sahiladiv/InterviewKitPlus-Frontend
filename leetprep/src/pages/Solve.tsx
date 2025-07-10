@@ -40,7 +40,7 @@ const Solve: React.FC = () => {
   const handleSubmit = async () => {
     try {
       const token = localStorage.getItem("access");
-      const response = await fetch(`http://localhost:8000/api/submissions/${problemId}/submit/`, {
+      const response = await fetch(`https://interviewkitplusapi.onrender.com/api/submissions/${problemId}/submit/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
