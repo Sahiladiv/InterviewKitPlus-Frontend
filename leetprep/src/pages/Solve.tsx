@@ -16,7 +16,7 @@ const Solve: React.FC = () => {
   useEffect(() => {
     const fetchProblem = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/problems/problems/${problemId}/`);
+        const res = await fetch(`https://interviewkitplusapi.onrender.com/api/problems/problems/${problemId}/`);
         if (!res.ok) throw new Error("Problem not found.");
         const data = await res.json();
         setProblem(data);
