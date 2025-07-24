@@ -47,13 +47,13 @@ const initialQuestion: Question = {
   test_cases: [],
 };
 
-// ---------- CONFIG ----------
 const API_BASE = "https://interviewkitplusapi.onrender.com";
-// If you host resume upload elsewhere, change the URL below.
 const RESUME_UPLOAD_URL = "http://localhost:8000/api/upload-resume/";
-// ----------------------------
 
-// ---------- AUTH HELPERS ----------
+// -----------------------
+// Token Refresh Utilities
+// -----------------------
+
 async function refreshAccessToken(): Promise<string | null> {
   const refresh = localStorage.getItem("refresh");
   if (!refresh) return null;
@@ -75,11 +75,7 @@ async function refreshAccessToken(): Promise<string | null> {
   return null;
 }
 
-// Generic fetch wrapper that auto-refreshes on 401 and retries once.
-async function fetchWithTokenRefresh(
-  url: string,
-  init: RequestInit = {}
-): Promise<Response> {
+async function fetchWithTokenRefresh(url: string, init: RequestInit = {}): Promise<Response> {
   let access = localStorage.getItem("access");
 
   const doFetch = async (token?: string) =>
@@ -87,34 +83,35 @@ async function fetchWithTokenRefresh(
       ...init,
       headers: {
         ...(init.headers || {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        Authorization: `Bearer ${token}`,
       },
     });
 
-  let response = await doFetch(access || undefined);
+  let res = await doFetch(access || undefined);
 
-  if (response.status === 401) {
+  if (res.status === 401) {
     const newAccess = await refreshAccessToken();
-    if (!newAccess) return response; // let caller handle logout
-    response = await doFetch(newAccess);
+    if (!newAccess) return res;
+    res = await doFetch(newAccess);
   }
 
-  return response;
+  return res;
 }
-// ----------------------------------
+
+// --------------------------
+// Component
+// --------------------------
 
 const MockInterview: React.FC = () => {
   const [questionType, setQuestionType] = useState<QuestionType>("technical");
   const [question, setQuestion] = useState<Question>(initialQuestion);
-
   const [answer, setAnswer] = useState<string>("");
   const [feedback, setFeedback] = useState<string>("");
-
-  const [recording, setRecording] = useState(false);
   const [loading, setLoading] = useState(false);
   const [questionLoading, setQuestionLoading] = useState(false);
   const [resumeUploadMessage, setResumeUploadMessage] = useState<string>("");
 
+  const [recording, setRecording] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
@@ -129,12 +126,25 @@ const MockInterview: React.FC = () => {
     }
 
     setQuestionLoading(true);
+
     try {
-      const res = await fetchWithTokenRefresh(
-        `${API_BASE}/api/mock/generate-question/`
-      );
-      const data: APIResponse = await res.json();
+      let res = await fetchWithTokenRefresh(`${API_BASE}/api/mock/generate-question/`);
+      let data: any;
+
+      try {
+        data = await res.json();
+      } catch (err) {
+        console.error("Failed to parse response JSON", err);
+        throw new Error("Invalid response format");
+      }
+
       console.log("Fetched question:", data);
+
+      if (res.status === 401 || data?.code === "token_not_valid") {
+        console.warn("Token invalid or expired:", data);
+        setQuestion(initialQuestion);
+        return;
+      }
 
       if (res.ok && data?.question) {
         const q = data.question;
@@ -149,11 +159,11 @@ const MockInterview: React.FC = () => {
           test_cases: q.test_cases || [],
         });
       } else {
-        console.error("Error fetching question:", data?.error || "Unknown error");
+        console.error("Error fetching question:", data?.detail || data?.error || "Unknown error");
         setQuestion(initialQuestion);
       }
     } catch (err) {
-      console.error("Fetch error:", err);
+      console.error("Network or unknown error:", err);
       setQuestion(initialQuestion);
     } finally {
       setAnswer("");
@@ -173,9 +183,9 @@ const MockInterview: React.FC = () => {
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      // TODO: Plug in evaluation endpoint using fetchWithTokenRefresh
+      // Integrate answer evaluation logic if needed
       setFeedback("✅ Answer submitted successfully. Here's what you could improve...");
-    } catch (error) {
+    } catch {
       setFeedback("❌ Submission failed.");
     } finally {
       setLoading(false);
@@ -197,7 +207,7 @@ const MockInterview: React.FC = () => {
         setResumeUploadMessage("✅ Resume uploaded and parsed successfully!");
         console.log("Extracted resume text:", data.text);
       } else {
-        setResumeUploadMessage(`❌ Failed to upload resume: ${data.error || "Unknown error"}`);
+        setResumeUploadMessage(`❌ Resume upload failed: ${data.error || "Unknown error"}`);
       }
     } catch (err) {
       console.error("Resume upload failed:", err);
@@ -206,10 +216,7 @@ const MockInterview: React.FC = () => {
   };
 
   const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true,
-    });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     if (videoRef.current) videoRef.current.srcObject = stream;
     const mediaRecorder = new MediaRecorder(stream);
     mediaRecorderRef.current = mediaRecorder;
@@ -236,24 +243,19 @@ const MockInterview: React.FC = () => {
           onChange={(e) => setQuestionType(e.target.value as QuestionType)}
           className="form-select w-auto"
         >
-          <option value="technical">Technical</option>
-          <option value="behavioral">Behavioral</option>
+          <option value="technical">🧠 Technical</option>
+          <option value="behavioral">💬 Behavioral</option>
         </select>
-
         {questionType === "technical" && (
-          <Button
-            variant="outline-secondary"
-            onClick={fetchQuestion}
-            disabled={questionLoading}
-          >
-          {questionLoading ? (
-            <>
-              <Spinner animation="border" size="sm" className="me-2" role="status" />
-              Generating…
-            </>
-          ) : (
-            "Generate new question"
-          )}
+          <Button variant="outline-secondary" onClick={fetchQuestion} disabled={questionLoading}>
+            {questionLoading ? (
+              <>
+                <Spinner animation="border" size="sm" className="me-2" role="status" />
+                Generating…
+              </>
+            ) : (
+              "Generate new question"
+            )}
           </Button>
         )}
       </div>
@@ -264,7 +266,7 @@ const MockInterview: React.FC = () => {
             <Card.Header>
               {questionType === "technical" ? "Technical Question" : "Behavioral Prompt"}
             </Card.Header>
-            <Card.Body style={{ whiteSpace: "pre-wrap" }}>
+            <Card.Body>
               {questionType === "technical" ? (
                 questionLoading ? (
                   <div className="d-flex align-items-center gap-2">
@@ -273,83 +275,15 @@ const MockInterview: React.FC = () => {
                   </div>
                 ) : question.description || question.title ? (
                   <>
-                    <h5 className="mb-3">{question.title}</h5>
-
-                    {question.description && (
-                      <p>
-                        <strong>Description:</strong> {question.description}
-                      </p>
-                    )}
-
-                    {question.input_format && (
-                      <p>
-                        <strong>Input Format:</strong> {question.input_format}
-                      </p>
-                    )}
-
-                    {question.output_format && (
-                      <p>
-                        <strong>Output Format:</strong> {question.output_format}
-                      </p>
-                    )}
-
-                    {question.constraints && (
-                      <p>
-                        <strong>Constraints:</strong> {question.constraints}
-                      </p>
-                    )}
-
-                    {question.example_input && (
-                      <div className="mb-2">
-                        <strong>Example Input:</strong>
-                        <pre className="bg-light p-2 rounded">
-                          {question.example_input}
-                        </pre>
-                      </div>
-                    )}
-
-                    {question.example_output && (
-                      <div className="mb-2">
-                        <strong>Example Output:</strong>
-                        <pre className="bg-light p-2 rounded">
-                          {question.example_output}
-                        </pre>
-                      </div>
-                    )}
-
-                    {question.test_cases.length > 0 && (
-                      <div className="mt-3">
-                        <strong>Test Cases:</strong>
-                        {question.test_cases.map((tc, idx) => (
-                          <Card key={idx} className="mt-2">
-                            <Card.Body>
-                              <p className="mb-1">
-                                <strong>Input:</strong>
-                              </p>
-                              <pre className="bg-light p-2 rounded">
-                                {tc.input}
-                              </pre>
-                              <p className="mb-1">
-                                <strong>Output:</strong>
-                              </p>
-                              <pre className="bg-light p-2 rounded">
-                                {tc.output}
-                              </pre>
-                              {tc.explanation && (
-                                <>
-                                  <p className="mb-1">
-                                    <strong>Explanation:</strong>
-                                  </p>
-                                  <pre className="bg-light p-2 rounded">
-                                    {tc.explanation}
-                                  </pre>
-                                </>
-                              )}
-                            </Card.Body>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
+                    <h5>{question.title}</h5>
+                    <p><strong>Description:</strong> {question.description}</p>
+                    <p><strong>Input Format:</strong> {question.input_format}</p>
+                    <p><strong>Output Format:</strong> {question.output_format}</p>
+                    <p><strong>Constraints:</strong> {question.constraints}</p>
+                    <p><strong>Example Input:</strong></p>
+                    <pre className="bg-light p-2">{question.example_input}</pre>
+                    <p><strong>Example Output:</strong></p>
+                    <pre className="bg-light p-2">{question.example_output}</pre>
                   </>
                 ) : (
                   <p>No question found. Try generating a new one.</p>
@@ -357,10 +291,7 @@ const MockInterview: React.FC = () => {
               ) : (
                 <>
                   <h5>Behavioral Interview</h5>
-                  <p>
-                    Click “Start Recording” to begin answering your behavioral
-                    question.
-                  </p>
+                  <p>Click “Start Recording” to begin answering your behavioral question.</p>
                 </>
               )}
             </Card.Body>
@@ -368,7 +299,7 @@ const MockInterview: React.FC = () => {
 
           {feedback && (
             <Alert className="mt-3" variant="info">
-              <strong>AI Feedback: </strong>
+              <strong>💡 AI Feedback: </strong>
               <p className="mb-0">{feedback}</p>
             </Alert>
           )}
@@ -384,19 +315,11 @@ const MockInterview: React.FC = () => {
                   theme="vs-dark"
                   value={answer}
                   onChange={handleAnswerChange}
-                  options={{
-                    fontSize: 14,
-                    minimap: { enabled: false },
-                    automaticLayout: true,
-                  }}
+                  options={{ fontSize: 14, minimap: { enabled: false }, automaticLayout: true }}
                 />
               </div>
               <div className="text-end">
-                <Button
-                  variant="success"
-                  onClick={handleSubmit}
-                  disabled={!answer || loading}
-                >
+                <Button variant="success" onClick={handleSubmit} disabled={!answer || loading}>
                   {loading ? "Evaluating..." : "Submit"}
                 </Button>
               </div>
@@ -405,26 +328,12 @@ const MockInterview: React.FC = () => {
             <Card>
               <Card.Body>
                 <h5>Video Interview</h5>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  muted
-                  className="w-100 bg-dark rounded shadow-sm"
-                  style={{ height: 300 }}
-                />
+                <video ref={videoRef} autoPlay muted className="w-100 bg-dark rounded" style={{ height: 300 }} />
                 <div className="d-flex gap-2 mt-3">
-                  <Button
-                    onClick={startRecording}
-                    disabled={recording}
-                    variant="outline-primary"
-                  >
+                  <Button onClick={startRecording} disabled={recording} variant="outline-primary">
                     Start Recording
                   </Button>
-                  <Button
-                    onClick={stopRecording}
-                    disabled={!recording}
-                    variant="outline-danger"
-                  >
+                  <Button onClick={stopRecording} disabled={!recording} variant="outline-danger">
                     Stop Recording
                   </Button>
                 </div>
@@ -447,9 +356,7 @@ const MockInterview: React.FC = () => {
               {resumeUploadMessage && (
                 <Alert
                   className="mt-2"
-                  variant={
-                    resumeUploadMessage.startsWith("✅") ? "success" : "danger"
-                  }
+                  variant={resumeUploadMessage.startsWith("✅") ? "success" : "danger"}
                 >
                   {resumeUploadMessage}
                 </Alert>
