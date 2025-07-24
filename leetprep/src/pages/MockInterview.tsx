@@ -30,7 +30,7 @@ const MockInterview: React.FC = () => {
       if (questionType === "technical") {
         try {
           const token = localStorage.getItem("access");
-          const res = await fetch("http://localhost:8000/api/mock/generate-question/", {
+          const res = await fetch("https://interviewkitplusapi.onrender.com/api/mock/generate-question/", {
             headers: {
               Authorization: `Bearer ${token}`,
             },
