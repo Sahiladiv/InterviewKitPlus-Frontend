@@ -124,7 +124,7 @@ const MockInterview: React.FC = () => {
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      // TODO: Call your evaluation endpoint here with `answer` + `question`
+      // TODO: Integrate code evaluation endpoint
       setFeedback("✅ Answer submitted successfully. Here's what you could improve...");
     } catch (error) {
       setFeedback("❌ Submission failed.");
@@ -136,15 +136,12 @@ const MockInterview: React.FC = () => {
   const handleResumeUpload = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-
     const token = localStorage.getItem("access");
 
     try {
       const res = await fetch("http://localhost:8000/api/upload-resume/", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
@@ -153,9 +150,7 @@ const MockInterview: React.FC = () => {
         setResumeUploadMessage("✅ Resume uploaded and parsed successfully!");
         console.log("Extracted resume text:", data.text);
       } else {
-        setResumeUploadMessage(
-          `❌ Failed to upload resume: ${data.error || "Unknown error"}`
-        );
+        setResumeUploadMessage(`❌ Failed to upload resume: ${data.error || "Unknown error"}`);
       }
     } catch (err) {
       console.error("Resume upload failed:", err);
@@ -164,10 +159,7 @@ const MockInterview: React.FC = () => {
   };
 
   const startRecording = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true,
-    });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     if (videoRef.current) videoRef.current.srcObject = stream;
     const mediaRecorder = new MediaRecorder(stream);
     mediaRecorderRef.current = mediaRecorder;
@@ -206,12 +198,7 @@ const MockInterview: React.FC = () => {
           >
             {questionLoading ? (
               <>
-                <Spinner
-                  animation="border"
-                  size="sm"
-                  className="me-2"
-                  role="status"
-                />
+                <Spinner animation="border" size="sm" className="me-2" role="status" />
                 Generating…
               </>
             ) : (
@@ -224,12 +211,8 @@ const MockInterview: React.FC = () => {
       <Row>
         <Col md={6} className="mb-4">
           <Card className="h-100">
-          <Card.Header className="d-flex justify-content-between align-items-center">
-              <span>
-                {questionType === "technical"
-                  ? "Technical Question"
-                  : "Behavioral Prompt"}
-              </span>
+            <Card.Header>
+              {questionType === "technical" ? "Technical Question" : "Behavioral Prompt"}
             </Card.Header>
             <Card.Body style={{ whiteSpace: "pre-wrap" }}>
               {questionType === "technical" ? (
@@ -238,51 +221,17 @@ const MockInterview: React.FC = () => {
                     <Spinner animation="border" size="sm" />
                     <span>Loading question…</span>
                   </div>
-                ) : question.title ? (
+                ) : question.description || question.title ? (
                   <>
                     <h5 className="mb-3">{question.title}</h5>
-
-                    {question.description && (
-                      <p>
-                        <strong>Description:</strong> {question.description}
-                      </p>
-                    )}
-
-                    {question.input_format && (
-                      <p>
-                        <strong>Input Format:</strong> {question.input_format}
-                      </p>
-                    )}
-
-                    {question.output_format && (
-                      <p>
-                        <strong>Output Format:</strong> {question.output_format}
-                      </p>
-                    )}
-
-                    {question.constraints && (
-                      <p>
-                        <strong>Constraints:</strong> {question.constraints}
-                      </p>
-                    )}
-
-                    {question.example_input && (
-                      <div className="mb-2">
-                        <strong>Example Input:</strong>
-                        <pre className="bg-light p-2 rounded">
-                          {question.example_input}
-                        </pre>
-                      </div>
-                    )}
-
-                    {question.example_output && (
-                      <div className="mb-2">
-                        <strong>Example Output:</strong>
-                        <pre className="bg-light p-2 rounded">
-                          {question.example_output}
-                        </pre>
-                      </div>
-                    )}
+                    <p><strong>Description:</strong> {question.description}</p>
+                    <p><strong>Input Format:</strong> {question.input_format}</p>
+                    <p><strong>Output Format:</strong> {question.output_format}</p>
+                    <p><strong>Constraints:</strong> {question.constraints}</p>
+                    <p><strong>Example Input:</strong></p>
+                    <pre className="bg-light p-2 rounded">{question.example_input}</pre>
+                    <p><strong>Example Output:</strong></p>
+                    <pre className="bg-light p-2 rounded">{question.example_output}</pre>
 
                     {question.test_cases.length > 0 && (
                       <div className="mt-3">
@@ -290,26 +239,14 @@ const MockInterview: React.FC = () => {
                         {question.test_cases.map((tc, idx) => (
                           <Card key={idx} className="mt-2">
                             <Card.Body>
-                              <p className="mb-1">
-                                <strong>Input:</strong>
-                              </p>
-                              <pre className="bg-light p-2 rounded">
-                                {tc.input}
-                              </pre>
-                              <p className="mb-1">
-                                <strong>Output:</strong>
-                              </p>
-                              <pre className="bg-light p-2 rounded">
-                                {tc.output}
-                              </pre>
+                              <p className="mb-1"><strong>Input:</strong></p>
+                              <pre className="bg-light p-2 rounded">{tc.input}</pre>
+                              <p className="mb-1"><strong>Output:</strong></p>
+                              <pre className="bg-light p-2 rounded">{tc.output}</pre>
                               {tc.explanation && (
                                 <>
-                                  <p className="mb-1">
-                                    <strong>Explanation:</strong>
-                                  </p>
-                                  <pre className="bg-light p-2 rounded">
-                                    {tc.explanation}
-                                  </pre>
+                                  <p className="mb-1"><strong>Explanation:</strong></p>
+                                  <pre className="bg-light p-2 rounded">{tc.explanation}</pre>
                                 </>
                               )}
                             </Card.Body>
@@ -324,10 +261,7 @@ const MockInterview: React.FC = () => {
               ) : (
                 <>
                   <h5>Behavioral Interview</h5>
-                  <p>
-                    Click “Start Recording” to begin answering your behavioral
-                    question.
-                  </p>
+                  <p>Click “Start Recording” to begin answering your behavioral question.</p>
                 </>
               )}
             </Card.Body>
@@ -351,11 +285,7 @@ const MockInterview: React.FC = () => {
                   theme="vs-dark"
                   value={answer}
                   onChange={handleAnswerChange}
-                  options={{
-                    fontSize: 14,
-                    minimap: { enabled: false },
-                    automaticLayout: true,
-                  }}
+                  options={{ fontSize: 14, minimap: { enabled: false }, automaticLayout: true }}
                 />
               </div>
               <div className="text-end">
@@ -380,18 +310,10 @@ const MockInterview: React.FC = () => {
                   style={{ height: 300 }}
                 />
                 <div className="d-flex gap-2 mt-3">
-                  <Button
-                    onClick={startRecording}
-                    disabled={recording}
-                    variant="outline-primary"
-                  >
+                  <Button onClick={startRecording} disabled={recording} variant="outline-primary">
                     Start Recording
                   </Button>
-                  <Button
-                    onClick={stopRecording}
-                    disabled={!recording}
-                    variant="outline-danger"
-                  >
+                  <Button onClick={stopRecording} disabled={!recording} variant="outline-danger">
                     Stop Recording
                   </Button>
                 </div>
@@ -399,7 +321,6 @@ const MockInterview: React.FC = () => {
             </Card>
           )}
 
-          {/* Resume upload (optional UI) */}
           <Card className="mt-3">
             <Card.Body>
               <h6>Upload Resume (optional)</h6>
@@ -409,18 +330,13 @@ const MockInterview: React.FC = () => {
                 accept=".pdf,.doc,.docx,.txt"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) {
-                    // store or directly upload
-                    handleResumeUpload(file);
-                  }
+                  if (file) handleResumeUpload(file);
                 }}
               />
               {resumeUploadMessage && (
                 <Alert
                   className="mt-2"
-                  variant={
-                    resumeUploadMessage.startsWith("✅") ? "success" : "danger"
-                  }
+                  variant={resumeUploadMessage.startsWith("✅") ? "success" : "danger"}
                 >
                   {resumeUploadMessage}
                 </Alert>
