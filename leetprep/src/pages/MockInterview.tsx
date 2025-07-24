@@ -22,14 +22,32 @@ const MockInterview: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
 
-  useEffect(() => {
+useEffect(() => {
+  const fetchQuestion = async () => {
     if (questionType === "technical") {
-      setQuestion({
-        title: "Two Sum",
-        description: "Return indices of the two numbers such that they add up to a specific target.",
-        example_input: "nums = [2,7,11,15], target = 9",
-        example_output: "[0,1]"
-      });
+      try {
+        const token = localStorage.getItem("access");
+        const res = await fetch("http://localhost:8000/api/generate-question/", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          setQuestion({
+            title: data.title || "Untitled",
+            description: data.problem,
+            example_input: data.test_cases?.[0]?.input || "",
+            example_output: data.test_cases?.[0]?.output || "",
+          });
+        } else {
+          console.error("Error fetching question:", data.error || "Unknown error");
+        }
+      } catch (err) {
+        console.error("Fetch error:", err);
+      }
     } else {
       setQuestion({
         title: "",
@@ -38,9 +56,13 @@ const MockInterview: React.FC = () => {
         example_output: ""
       });
     }
+
     setAnswer("");
     setFeedback("");
-  }, [questionType]);
+  };
+
+  fetchQuestion();
+}, [questionType]);
 
   const handleAnswerChange = (value: string | undefined) => {
     setAnswer(value || "");
