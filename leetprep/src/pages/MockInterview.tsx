@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Container, Row, Col, Card, Button, Alert, Spinner } from "react-bootstrap";
 import Editor from "@monaco-editor/react";
+import { fetchWithTokenRefresh, API_BASE_URL } from "../utils/api";
 
 type QuestionType = "technical" | "behavioral";
 
@@ -47,60 +48,7 @@ const initialQuestion: Question = {
   test_cases: [],
 };
 
-const API_BASE = "https://interviewkitplusapi.onrender.com";
 const RESUME_UPLOAD_URL = "http://localhost:8000/api/upload-resume/";
-
-// -----------------------
-// Token Refresh Utilities
-// -----------------------
-
-async function refreshAccessToken(): Promise<string | null> {
-  const refresh = localStorage.getItem("refresh");
-  if (!refresh) return null;
-
-  const res = await fetch(`${API_BASE}/api/token/refresh/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh }),
-  });
-
-  if (!res.ok) return null;
-
-  const data = await res.json();
-  const newAccess = data.access;
-  if (newAccess) {
-    localStorage.setItem("access", newAccess);
-    return newAccess;
-  }
-  return null;
-}
-
-async function fetchWithTokenRefresh(url: string, init: RequestInit = {}): Promise<Response> {
-  let access = localStorage.getItem("access");
-
-  const doFetch = async (token?: string) =>
-    fetch(url, {
-      ...init,
-      headers: {
-        ...(init.headers || {}),
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-  let res = await doFetch(access || undefined);
-
-  if (res.status === 401) {
-    const newAccess = await refreshAccessToken();
-    if (!newAccess) return res;
-    res = await doFetch(newAccess);
-  }
-
-  return res;
-}
-
-// --------------------------
-// Component
-// --------------------------
 
 const MockInterview: React.FC = () => {
   const [questionType, setQuestionType] = useState<QuestionType>("technical");
@@ -128,23 +76,8 @@ const MockInterview: React.FC = () => {
     setQuestionLoading(true);
 
     try {
-      let res = await fetchWithTokenRefresh(`${API_BASE}/api/mock/generate-question/`);
-      let data: any;
-
-      try {
-        data = await res.json();
-      } catch (err) {
-        console.error("Failed to parse response JSON", err);
-        throw new Error("Invalid response format");
-      }
-
-      console.log("Fetched question:", data);
-
-      if (res.status === 401 || data?.code === "token_not_valid") {
-        console.warn("Token invalid or expired:", data);
-        setQuestion(initialQuestion);
-        return;
-      }
+      const res = await fetchWithTokenRefresh(`${API_BASE_URL}/api/mock/generate-question/`);
+      const data = await res.json();
 
       if (res.ok && data?.question) {
         const q = data.question;
@@ -159,11 +92,11 @@ const MockInterview: React.FC = () => {
           test_cases: q.test_cases || [],
         });
       } else {
-        console.error("Error fetching question:", data?.detail || data?.error || "Unknown error");
         setQuestion(initialQuestion);
+        console.error("Fetch failed:", data?.error || "Unknown error");
       }
     } catch (err) {
-      console.error("Network or unknown error:", err);
+      console.error("Network error:", err);
       setQuestion(initialQuestion);
     } finally {
       setAnswer("");
@@ -183,7 +116,6 @@ const MockInterview: React.FC = () => {
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      // Integrate answer evaluation logic if needed
       setFeedback("✅ Answer submitted successfully. Here's what you could improve...");
     } catch {
       setFeedback("❌ Submission failed.");
